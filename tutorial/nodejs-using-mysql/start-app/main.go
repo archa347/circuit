@@ -104,7 +104,19 @@ func getDarwinHostIP(host client.Anchor) string {
 	return out
 }
 
-func getUbuntuHostIP(host client.Anchor) string {
+func getUbuntuHostPrivateIP(host client.Anchor) string {
+	out, err := runShell(host, `ifconfig eth1 | awk '/inet addr/ {split($2, a, ":"); print a[2] }'`)
+	if err != nil {
+		fatalf("get ip error: %v", err)
+	}
+	out = strings.TrimSpace(out)
+	if _, err := net.ResolveIPAddr("ip", out); err != nil {
+		fatalf("ip %q unrecognizable: %v", out, err)
+	}
+	return out
+}
+
+func getUbuntuHostPublicIP(host client.Anchor) string {
 	out, err := runShell(host, `ifconfig eth0 | awk '/inet addr/ {split($2, a, ":"); print a[2] }'`)
 	if err != nil {
 		fatalf("get ip error: %v", err)
@@ -143,7 +155,7 @@ func getEc2PrivateIP(host client.Anchor) string {
 func startMysql(host client.Anchor) (ip, port string) {
 
 	// Retrieve the IP address of this host within the cluster's private network.
-	ip = getEc2PrivateIP(host)
+	ip = getUbuntuHostPrivateIP(host)
 
 	// We use the default MySQL server port
 	port = strconv.Itoa(3306)
@@ -193,7 +205,7 @@ func startNodejs(host client.Anchor, mysqlIP, mysqlPort string) (ip, port string
 	}()
 
 	// Start node.js application
-	ip = getEc2PublicIP(host)
+	ip = getUbuntuHostPublicIP(host)
 	port = "8080"
 	job := host.Walk([]string{"nodejs"})
 	shell := fmt.Sprintf(
